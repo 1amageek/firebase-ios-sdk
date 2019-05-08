@@ -36,7 +36,7 @@ static NSString *const kFacebookTestAccountName = KFACEBOOK_USER_NAME;
 
 @implementation FacebookAuthTests
 
-- (void)DISABLE_testSignInWithFaceboook {
+- (void)testSignInWithFaceboook {
   FIRAuth *auth = [FIRAuth auth];
   if (!auth) {
     XCTFail(@"Could not obtain auth object.");
@@ -54,7 +54,7 @@ static NSString *const kFacebookTestAccountName = KFACEBOOK_USER_NAME;
   XCTestExpectation *expectation = [self expectationWithDescription:@"Facebook sign-in finished."];
 
   [auth signInWithCredential:credential
-                  completion:^(FIRUser *user, NSError *error) {
+                  completion:^(FIRAuthDataResult *result, NSError *error) {
                     if (error) {
                       NSLog(@"Facebook sign in error: %@", error);
                     }
@@ -76,7 +76,7 @@ static NSString *const kFacebookTestAccountName = KFACEBOOK_USER_NAME;
   [self deleteFacebookTestingAccountbyId:facebookAccountId];
 }
 
-- (void)DISABLE_testLinkAnonymousAccountToFacebookAccount {
+- (void)testLinkAnonymousAccountToFacebookAccount {
   FIRAuth *auth = [FIRAuth auth];
   if (!auth) {
     XCTFail(@"Could not obtain auth object.");
@@ -94,7 +94,7 @@ static NSString *const kFacebookTestAccountName = KFACEBOOK_USER_NAME;
 
   XCTestExpectation *expectation = [self expectationWithDescription:@"Facebook linking finished."];
   [auth.currentUser linkWithCredential:credential
-                            completion:^(FIRUser *user, NSError *error) {
+                            completion:^(FIRAuthDataResult *result, NSError *error) {
                               if (error) {
                                 NSLog(@"Link to Facebok error: %@", error);
                               }

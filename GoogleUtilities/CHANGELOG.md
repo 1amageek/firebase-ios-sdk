@@ -1,5 +1,17 @@
 # Unreleased
 
+# 6.0.0
+- GULAppDelegateSwizzler - proxy APNS methods separately. (#2835)
+- Cocoapods 1.7.0 multiproject support. (#2751)
+- Bump minimium iOS version to iOS 8. (#2876)
+
+# 5.7.0
+- Restore to 5.5.0 tag after increased App Store warnings. (#2807)
+
+# 5.6.0
+- `GULAppDelegateSwizzler`: support of remote notification methods. (#2698)
+- `GULAppDelegateSwizzler`: tvOS support. (#2698)
+
 # 5.5.0
 - Revert 5.4.x changes restoring 5.3.7 version.
 

@@ -60,7 +60,7 @@ class XcTestRecorder {
         recordFailureWithDescription:[NSString stringWithUTF8String:message]
                               inFile:[NSString stringWithUTF8String:file_]
                               atLine:line_
-                            expected:YES];
+                            expected:true];
   }
 
  private:
@@ -144,10 +144,9 @@ OBJC_PRINT_TO(FIRWriteBatch);
 OBJC_PRINT_TO(FSTArrayRemoveFieldValue);
 OBJC_PRINT_TO(FSTArrayUnionFieldValue);
 OBJC_PRINT_TO(FSTArrayValue);
-OBJC_PRINT_TO(FSTAsyncQueryListener);
 OBJC_PRINT_TO(FSTBlobValue);
-OBJC_PRINT_TO(FSTBooleanValue);
 OBJC_PRINT_TO(FSTBound);
+OBJC_PRINT_TO(FSTDelegateValue);
 OBJC_PRINT_TO(FSTDeleteFieldValue);
 OBJC_PRINT_TO(FSTDeleteMutation);
 OBJC_PRINT_TO(FSTDeletedDocument);
@@ -191,7 +190,6 @@ OBJC_PRINT_TO(FSTObjectValue);
 OBJC_PRINT_TO(FSTPatchMutation);
 OBJC_PRINT_TO(FSTQuery);
 OBJC_PRINT_TO(FSTQueryData);
-OBJC_PRINT_TO(FSTQueryListener);
 OBJC_PRINT_TO(FSTReferenceValue);
 OBJC_PRINT_TO(FSTRelationFilter);
 OBJC_PRINT_TO(FSTSerializerBeta);

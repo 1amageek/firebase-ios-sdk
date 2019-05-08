@@ -35,6 +35,7 @@
 #import "Firestore/Source/Model/FSTFieldValue.h"
 #import "Firestore/Source/Model/FSTMutation.h"
 
+#include "Firestore/core/src/firebase/firestore/core/filter.h"
 #include "Firestore/core/src/firebase/firestore/core/view_snapshot.h"
 #include "Firestore/core/src/firebase/firestore/model/database_id.h"
 #include "Firestore/core/src/firebase/firestore/model/document_key.h"
@@ -54,9 +55,11 @@
 
 namespace testutil = firebase::firestore::testutil;
 namespace util = firebase::firestore::util;
+using firebase::firestore::core::Filter;
 using firebase::firestore::core::ParsedUpdateData;
 using firebase::firestore::core::ViewSnapshot;
 using firebase::firestore::model::DatabaseId;
+using firebase::firestore::model::DocumentComparator;
 using firebase::firestore::model::DocumentKey;
 using firebase::firestore::model::DocumentKeySet;
 using firebase::firestore::model::DocumentSet;
@@ -147,7 +150,7 @@ FSTFieldValue *FSTTestFieldValue(id _Nullable value) {
 
 FSTObjectValue *FSTTestObjectValue(NSDictionary<NSString *, id> *data) {
   FSTFieldValue *wrapped = FSTTestFieldValue(data);
-  HARD_ASSERT([wrapped isKindOfClass:[FSTObjectValue class]], "Unsupported value: %s", data);
+  HARD_ASSERT(wrapped.type == FieldValue::Type::Object, "Unsupported value: %s", data);
   return (FSTObjectValue *)wrapped;
 }
 
@@ -195,19 +198,19 @@ FSTQuery *FSTTestQuery(const absl::string_view path) {
 
 FSTFilter *FSTTestFilter(const absl::string_view field, NSString *opString, id value) {
   const FieldPath path = testutil::Field(field);
-  FSTRelationFilterOperator op;
+  Filter::Operator op;
   if ([opString isEqualToString:@"<"]) {
-    op = FSTRelationFilterOperatorLessThan;
+    op = Filter::Operator::LessThan;
   } else if ([opString isEqualToString:@"<="]) {
-    op = FSTRelationFilterOperatorLessThanOrEqual;
+    op = Filter::Operator::LessThanOrEqual;
   } else if ([opString isEqualToString:@"=="]) {
-    op = FSTRelationFilterOperatorEqual;
+    op = Filter::Operator::Equal;
   } else if ([opString isEqualToString:@">="]) {
-    op = FSTRelationFilterOperatorGreaterThanOrEqual;
+    op = Filter::Operator::GreaterThanOrEqual;
   } else if ([opString isEqualToString:@">"]) {
-    op = FSTRelationFilterOperatorGreaterThan;
+    op = Filter::Operator::GreaterThan;
   } else if ([opString isEqualToString:@"array_contains"]) {
-    op = FSTRelationFilterOperatorArrayContains;
+    op = Filter::Operator::ArrayContains;
   } else {
     HARD_FAIL("Unsupported operator type: %s", opString);
   }
@@ -230,15 +233,15 @@ FSTSortOrder *FSTTestOrderBy(const absl::string_view field, NSString *direction)
   return [FSTSortOrder sortOrderWithFieldPath:path ascending:ascending];
 }
 
-NSComparator FSTTestDocComparator(const absl::string_view fieldPath) {
+DocumentComparator FSTTestDocComparator(const absl::string_view fieldPath) {
   FSTQuery *query = [FSTTestQuery("docs")
       queryByAddingSortOrder:[FSTSortOrder sortOrderWithFieldPath:testutil::Field(fieldPath)
                                                         ascending:YES]];
   return [query comparator];
 }
 
-DocumentSet FSTTestDocSet(NSComparator comp, NSArray<FSTDocument *> *docs) {
-  DocumentSet docSet{comp};
+DocumentSet FSTTestDocSet(DocumentComparator comp, NSArray<FSTDocument *> *docs) {
+  DocumentSet docSet{std::move(comp)};
   for (FSTDocument *doc in docs) {
     docSet = docSet.insert(doc);
   }

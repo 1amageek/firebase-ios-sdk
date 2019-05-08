@@ -26,16 +26,17 @@
 #include "Firestore/core/src/firebase/firestore/immutable/sorted_map.h"
 #include "Firestore/core/src/firebase/firestore/util/comparison.h"
 #include "Firestore/core/src/firebase/firestore/util/hard_assert.h"
+#include "Firestore/core/src/firebase/firestore/util/hashing.h"
 #include "absl/memory/memory.h"
-
-using firebase::firestore::util::Comparator;
 
 namespace firebase {
 namespace firestore {
 namespace model {
 
 using Type = FieldValue::Type;
-using firebase::firestore::util::ComparisonResult;
+
+using util::Compare;
+using util::ComparisonResult;
 
 FieldValue::FieldValue(const FieldValue& value) {
   *this = value;
@@ -347,72 +348,93 @@ FieldValue FieldValue::FromMap(FieldValue::Map&& value) {
   return result;
 }
 
-bool operator<(const FieldValue::Map& lhs, const FieldValue::Map& rhs) {
-  return std::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(),
-                                      rhs.end());
-}
+size_t FieldValue::Hash() const {
+  switch (type()) {
+    case FieldValue::Type::Null:
+      HARD_FAIL("TODO(rsgowman): Implement");
 
-bool operator<(const FieldValue& lhs, const FieldValue& rhs) {
-  if (!FieldValue::Comparable(lhs.type(), rhs.type())) {
-    return lhs.type() < rhs.type();
+    case FieldValue::Type::Boolean:
+      return util::Hash(boolean_value());
+
+    case FieldValue::Type::Integer:
+    case FieldValue::Type::Double:
+    case FieldValue::Type::Timestamp:
+    case FieldValue::Type::ServerTimestamp:
+      HARD_FAIL("TODO(rsgowman): Implement");
+
+    case FieldValue::Type::String:
+      return util::Hash(string_value());
+
+    case FieldValue::Type::Blob:
+    case FieldValue::Type::Reference:
+    case FieldValue::Type::GeoPoint:
+    case FieldValue::Type::Array:
+    case FieldValue::Type::Object:
+      HARD_FAIL("TODO(rsgowman): Implement");
   }
 
-  switch (lhs.type()) {
+  UNREACHABLE();
+}
+
+ComparisonResult FieldValue::CompareTo(const FieldValue& rhs) const {
+  if (!FieldValue::Comparable(type(), rhs.type())) {
+    return Compare(type(), rhs.type());
+  }
+
+  ComparisonResult cmp;
+  switch (type()) {
     case Type::Null:
-      return false;
+      return ComparisonResult::Same;
     case Type::Boolean:
-      return Comparator<bool>()(lhs.boolean_value_, rhs.boolean_value_);
+      return Compare(boolean_value_, rhs.boolean_value_);
     case Type::Integer:
       if (rhs.type() == Type::Integer) {
-        return Comparator<int64_t>()(lhs.integer_value_, rhs.integer_value_);
+        return Compare(integer_value_, rhs.integer_value_);
       } else {
-        return util::CompareMixedNumber(rhs.double_value_,
-                                        lhs.integer_value_) ==
-               ComparisonResult::Descending;
+        return util::ReverseOrder(
+            util::CompareMixedNumber(rhs.double_value_, integer_value_));
       }
     case Type::Double:
       if (rhs.type() == Type::Double) {
-        return Comparator<double>()(lhs.double_value_, rhs.double_value_);
+        return Compare(double_value_, rhs.double_value_);
       } else {
-        return util::CompareMixedNumber(lhs.double_value_,
-                                        rhs.integer_value_) ==
-               ComparisonResult::Ascending;
+        return util::CompareMixedNumber(double_value_, rhs.integer_value_);
       }
     case Type::Timestamp:
       if (rhs.type() == Type::Timestamp) {
-        return *lhs.timestamp_value_ < *rhs.timestamp_value_;
+        return Compare(*timestamp_value_, *rhs.timestamp_value_);
       } else {
-        return true;
+        return ComparisonResult::Ascending;
       }
     case Type::ServerTimestamp:
       if (rhs.type() == Type::ServerTimestamp) {
-        return lhs.server_timestamp_value_->local_write_time <
-               rhs.server_timestamp_value_->local_write_time;
+        return Compare(server_timestamp_value_->local_write_time,
+                       rhs.server_timestamp_value_->local_write_time);
       } else {
-        return false;
+        return ComparisonResult::Descending;
       }
     case Type::String:
-      return lhs.string_value_->compare(*rhs.string_value_) < 0;
+      return Compare(*string_value_, *rhs.string_value_);
     case Type::Blob:
-      return *lhs.blob_value_ < *rhs.blob_value_;
+      return Compare(*blob_value_, *rhs.blob_value_);
     case Type::Reference:
-      return *lhs.reference_value_->database_id <
-                 *rhs.reference_value_->database_id ||
-             (*lhs.reference_value_->database_id ==
-                  *rhs.reference_value_->database_id &&
-              lhs.reference_value_->reference <
-                  rhs.reference_value_->reference);
+      cmp = Compare(reference_value_->database_id,
+                    rhs.reference_value_->database_id);
+      if (!util::Same(cmp)) return cmp;
+
+      return Compare(reference_value_->reference,
+                     rhs.reference_value_->reference);
     case Type::GeoPoint:
-      return *lhs.geo_point_value_ < *rhs.geo_point_value_;
+      return Compare(*geo_point_value_, *rhs.geo_point_value_);
     case Type::Array:
-      return *lhs.array_value_ < *rhs.array_value_;
+      return CompareContainer(*array_value_, *rhs.array_value_);
     case Type::Object:
-      return *lhs.object_value_ < *rhs.object_value_;
+      return CompareContainer(*object_value_, *rhs.object_value_);
     default:
-      HARD_FAIL("Unsupported type %s", lhs.type());
+      HARD_FAIL("Unsupported type %s", type());
       // return false if assertion does not abort the program. We will say
       // each unsupported type takes only one value thus everything is equal.
-      return false;
+      return ComparisonResult::Same;
   }
 }
 
@@ -494,6 +516,10 @@ ObjectValue ObjectValue::FromMap(const FieldValue::Map& value) {
 
 ObjectValue ObjectValue::FromMap(FieldValue::Map&& value) {
   return ObjectValue(FieldValue::FromMap(std::move(value)));
+}
+
+ComparisonResult ObjectValue::CompareTo(const ObjectValue& rhs) const {
+  return fv_.CompareTo(rhs.fv_);
 }
 
 }  // namespace model

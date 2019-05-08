@@ -15,11 +15,11 @@
 #include <sys/utsname.h>
 
 #import "FIRApp.h"
-#import "FIRConfiguration.h"
-#import "Private/FIRAnalyticsConfiguration+Internal.h"
+#import "Private/FIRAnalyticsConfiguration.h"
 #import "Private/FIRAppInternal.h"
 #import "Private/FIRBundleUtil.h"
 #import "Private/FIRComponentContainerInternal.h"
+#import "Private/FIRConfigurationInternal.h"
 #import "Private/FIRLibrary.h"
 #import "Private/FIRLogger.h"
 #import "Private/FIROptionsInternal.h"
@@ -139,6 +139,17 @@ static NSMutableDictionary *sLibraryVersions;
   [FIRApp configureWithName:kFIRDefaultAppName options:options];
 }
 
++ (NSCharacterSet *)applicationNameAllowedCharacters {
+  static NSCharacterSet *applicationNameAllowedCharacters;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    NSMutableCharacterSet *allowedNameCharacters = [NSMutableCharacterSet alphanumericCharacterSet];
+    [allowedNameCharacters addCharactersInString:@"-_"];
+    applicationNameAllowedCharacters = [allowedNameCharacters copy];
+  });
+  return applicationNameAllowedCharacters;
+}
+
 + (void)configureWithName:(NSString *)name options:(FIROptions *)options {
   if (!name || !options) {
     [NSException raise:kFirebaseCoreErrorDomain format:@"Neither name nor options can be nil."];
@@ -156,19 +167,19 @@ static NSMutableDictionary *sLibraryVersions;
     FIRLogDebug(kFIRLoggerCore, @"I-COR000001", @"Configuring the default app.");
   } else {
     // Validate the app name and ensure it hasn't been configured already.
-    for (NSUInteger charIndex = 0; charIndex < name.length; charIndex++) {
-      char character = [name characterAtIndex:charIndex];
-      if (!((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
-            (character >= '0' && character <= '9') || character == '_' || character == '-')) {
-        [NSException raise:kFirebaseCoreErrorDomain
-                    format:@"App name can only contain alphanumeric (A-Z,a-z,0-9), "
-                           @"hyphen (-), and underscore (_) characters"];
-      }
+    NSCharacterSet *nameCharacters = [NSCharacterSet characterSetWithCharactersInString:name];
+
+    if (![[self applicationNameAllowedCharacters] isSupersetOfSet:nameCharacters]) {
+      [NSException raise:kFirebaseCoreErrorDomain
+                  format:@"App name can only contain alphanumeric, "
+                         @"hyphen (-), and underscore (_) characters"];
     }
 
-    if (sAllApps && sAllApps[name]) {
-      [NSException raise:kFirebaseCoreErrorDomain
-                  format:@"App named %@ has already been configured.", name];
+    @synchronized(self) {
+      if (sAllApps && sAllApps[name]) {
+        [NSException raise:kFirebaseCoreErrorDomain
+                    format:@"App named %@ has already been configured.", name];
+      }
     }
 
     FIRLogDebug(kFIRLoggerCore, @"I-COR000002", @"Configuring app named %@", name);
@@ -214,18 +225,19 @@ static NSMutableDictionary *sLibraryVersions;
     if (!sAllApps) {
       FIRLogError(kFIRLoggerCore, @"I-COR000005", @"No app has been configured yet.");
     }
-    NSDictionary *dict = [NSDictionary dictionaryWithDictionary:sAllApps];
-    return dict;
+    return [sAllApps copy];
   }
 }
 
 // Public only for tests
 + (void)resetApps {
-  sDefaultApp = nil;
-  [sAllApps removeAllObjects];
-  sAllApps = nil;
-  [sLibraryVersions removeAllObjects];
-  sLibraryVersions = nil;
+  @synchronized(self) {
+    sDefaultApp = nil;
+    [sAllApps removeAllObjects];
+    sAllApps = nil;
+    [sLibraryVersions removeAllObjects];
+    sLibraryVersions = nil;
+  }
 }
 
 - (void)deleteApp:(FIRAppVoidBoolCallback)completion {
@@ -308,11 +320,7 @@ static NSMutableDictionary *sLibraryVersions;
   // always initialize first by itself before the other SDKs.
   if ([self.name isEqualToString:kFIRDefaultAppName]) {
     Class firAnalyticsClass = NSClassFromString(@"FIRAnalytics");
-    if (!firAnalyticsClass) {
-      FIRLogWarning(kFIRLoggerCore, @"I-COR000022",
-                    @"Firebase Analytics is not available. To add it, include Firebase/Core in the "
-                    @"Podfile or add FirebaseAnalytics.framework to the Link Build Phase");
-    } else {
+    if (firAnalyticsClass) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wundeclared-selector"
       SEL startWithConfigurationSelector = @selector(startWithConfiguration:options:);
@@ -423,8 +431,10 @@ static NSMutableDictionary *sLibraryVersions;
 
   // This is the new way of sending information to SDKs.
   // TODO: Do we want this on a background thread, maybe?
-  for (Class<FIRLibrary> library in sRegisteredAsConfigurable) {
-    [library configureWithApp:app];
+  @synchronized(self) {
+    for (Class<FIRLibrary> library in sRegisteredAsConfigurable) {
+      [library configureWithApp:app];
+    }
   }
 }
 
@@ -476,10 +486,12 @@ static NSMutableDictionary *sLibraryVersions;
   // add the name/version pair to the dictionary.
   if ([name rangeOfCharacterFromSet:disallowedSet].location == NSNotFound &&
       [version rangeOfCharacterFromSet:disallowedSet].location == NSNotFound) {
-    if (!sLibraryVersions) {
-      sLibraryVersions = [[NSMutableDictionary alloc] init];
+    @synchronized(self) {
+      if (!sLibraryVersions) {
+        sLibraryVersions = [[NSMutableDictionary alloc] init];
+      }
+      sLibraryVersions[name] = version;
     }
-    sLibraryVersions[name] = version;
   } else {
     FIRLogError(kFIRLoggerCore, @"I-COR000027",
                 @"The library name (%@) or version number (%@) contain invalid characters. "
@@ -508,20 +520,24 @@ static NSMutableDictionary *sLibraryVersions;
     dispatch_once(&onceToken, ^{
       sRegisteredAsConfigurable = [[NSMutableArray alloc] init];
     });
-    [sRegisteredAsConfigurable addObject:library];
+    @synchronized(self) {
+      [sRegisteredAsConfigurable addObject:library];
+    }
   }
   [self registerLibrary:name withVersion:version];
 }
 
 + (NSString *)firebaseUserAgent {
-  NSMutableArray<NSString *> *libraries =
-      [[NSMutableArray<NSString *> alloc] initWithCapacity:sLibraryVersions.count];
-  for (NSString *libraryName in sLibraryVersions) {
-    [libraries
-        addObject:[NSString stringWithFormat:@"%@/%@", libraryName, sLibraryVersions[libraryName]]];
+  @synchronized(self) {
+    NSMutableArray<NSString *> *libraries =
+        [[NSMutableArray<NSString *> alloc] initWithCapacity:sLibraryVersions.count];
+    for (NSString *libraryName in sLibraryVersions) {
+      [libraries addObject:[NSString stringWithFormat:@"%@/%@", libraryName,
+                                                      sLibraryVersions[libraryName]]];
+    }
+    [libraries sortUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
+    return [libraries componentsJoinedByString:@" "];
   }
-  [libraries sortUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
-  return [libraries componentsJoinedByString:@" "];
 }
 
 - (void)checkExpectedBundleID {

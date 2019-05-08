@@ -154,6 +154,7 @@ cc_test(
     hashing_test.cc
     iterator_adaptors_test.cc
     ordered_code_test.cc
+    status_apple_test.mm
     status_test.cc
     status_test_util.h
     statusor_test.cc
@@ -162,7 +163,6 @@ cc_test(
     string_format_test.cc
     string_util_test.cc
     string_win_test.cc
-    type_traits_apple_test.mm
   DEPENDS
     absl_base
     absl_strings

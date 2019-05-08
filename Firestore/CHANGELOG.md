@@ -1,4 +1,16 @@
 # Unreleased
+
+# 1.3.0
+- [feature] You can now query across all collections in your database with a
+  given collection ID using the `Firestore.collectionGroup()` method.
+- [feature] Added community support for tvOS.
+
+# 1.2.1
+- [fixed] Fixed a use-after-free bug that could be observed when using snapshot
+  listeners on temporary document references (#2682).
+
+# 1.2.0
+- [feature] Added community support for macOS (#434).
 - [fixed] Fixed the way gRPC certificates are loaded on macOS (#2604).
 
 # 1.1.0

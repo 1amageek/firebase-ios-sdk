@@ -24,8 +24,6 @@
 
 #import "Firestore/Example/Tests/Util/FSTHelpers.h"
 #import "Firestore/Example/Tests/Util/FSTIntegrationTestCase.h"
-// TODO(b/116617988): Remove Internal include once CG queries are public.
-#import "Firestore/Source/API/FIRFirestore+Internal.h"
 
 // We have tests for passing nil when nil is not supposed to be allowed. So suppress the warnings.
 #pragma clang diagnostic ignored "-Wnonnull"
@@ -40,14 +38,14 @@
 - (void)testNilHostFails {
   FIRFirestoreSettings *settings = self.db.settings;
   FSTAssertThrows(settings.host = nil,
-                  @"host setting may not be nil. You should generally just use the default value "
+                  @"Host setting may not be nil. You should generally just use the default value "
                    "(which is firestore.googleapis.com)");
 }
 
 - (void)testNilDispatchQueueFails {
   FIRFirestoreSettings *settings = self.db.settings;
   FSTAssertThrows(settings.dispatchQueue = nil,
-                  @"dispatch queue setting may not be nil. Create a new dispatch queue with "
+                  @"Dispatch queue setting may not be nil. Create a new dispatch queue with "
                    "dispatch_queue_create(\"com.example.MyQueue\", NULL) or just use the default "
                    "(which is the main queue, returned from dispatch_get_main_queue())");
 }
@@ -171,6 +169,8 @@
 }
 
 - (void)testWritesWithIndirectlyNestedArraysSucceed {
+  if ([FSTIntegrationTestCase isRunningAgainstEmulator]) return;
+
   NSDictionary<NSString *, id> *data = @{@"nested-array" : @[ @1, @{@"foo" : @[ @2 ]} ]};
 
   FIRDocumentReference *ref = [self documentRef];
@@ -394,18 +394,18 @@
 
 - (void)testNonEqualityQueriesOnNullOrNaNFail {
   FSTAssertThrows([[self collectionRef] queryWhereField:@"a" isGreaterThan:nil],
-                  @"Invalid Query. You can only perform equality comparisons on nil / NSNull.");
+                  @"Invalid Query. Nil and NSNull only support equality comparisons.");
   FSTAssertThrows([[self collectionRef] queryWhereField:@"a" isGreaterThan:[NSNull null]],
-                  @"Invalid Query. You can only perform equality comparisons on nil / NSNull.");
+                  @"Invalid Query. Nil and NSNull only support equality comparisons.");
   FSTAssertThrows([[self collectionRef] queryWhereField:@"a" arrayContains:nil],
-                  @"Invalid Query. You can only perform equality comparisons on nil / NSNull.");
+                  @"Invalid Query. Nil and NSNull only support equality comparisons.");
   FSTAssertThrows([[self collectionRef] queryWhereField:@"a" arrayContains:[NSNull null]],
-                  @"Invalid Query. You can only perform equality comparisons on nil / NSNull.");
+                  @"Invalid Query. Nil and NSNull only support equality comparisons.");
 
   FSTAssertThrows([[self collectionRef] queryWhereField:@"a" isGreaterThan:@(NAN)],
-                  @"Invalid Query. You can only perform equality comparisons on NaN.");
+                  @"Invalid Query. NaN only supports equality comparisons.");
   FSTAssertThrows([[self collectionRef] queryWhereField:@"a" arrayContains:@(NAN)],
-                  @"Invalid Query. You can only perform equality comparisons on NaN.");
+                  @"Invalid Query. NaN only supports equality comparisons.");
 }
 
 - (void)testQueryCannotBeCreatedFromDocumentsMissingSortValues {
@@ -704,7 +704,7 @@
 
 - (void)verifyExceptionForInvalidLatitude:(double)latitude {
   NSString *reason = [NSString
-      stringWithFormat:@"GeoPoint requires a latitude value in the range of [-90, 90], but was %f",
+      stringWithFormat:@"GeoPoint requires a latitude value in the range of [-90, 90], but was %g",
                        latitude];
   FSTAssertThrows([[FIRGeoPoint alloc] initWithLatitude:latitude longitude:0], reason);
 }
@@ -712,7 +712,7 @@
 - (void)verifyExceptionForInvalidLongitude:(double)longitude {
   NSString *reason =
       [NSString stringWithFormat:
-                    @"GeoPoint requires a longitude value in the range of [-180, 180], but was %f",
+                    @"GeoPoint requires a longitude value in the range of [-180, 180], but was %g",
                     longitude];
   FSTAssertThrows([[FIRGeoPoint alloc] initWithLatitude:0 longitude:longitude], reason);
 }

@@ -20,8 +20,6 @@
 
 #import "Firestore/Example/Tests/Util/FSTEventAccumulator.h"
 #import "Firestore/Example/Tests/Util/FSTIntegrationTestCase.h"
-// TODO(b/116617988): Remove Internal include once CG queries are public.
-#import "Firestore/Source/API/FIRFirestore+Internal.h"
 
 @interface FIRQueryTests : FSTIntegrationTestCase
 @end
@@ -297,6 +295,8 @@
 }
 
 - (void)testCollectionGroupQueries {
+  if ([FSTIntegrationTestCase isRunningAgainstEmulator]) return;  // b/131774876
+
   // Use .document() to get a random collection group name to use but ensure it starts with 'b'
   // for predictable ordering.
   NSString *collectionGroup = [NSString
@@ -331,6 +331,8 @@
 }
 
 - (void)testCollectionGroupQueriesWithStartAtEndAtWithArbitraryDocumentIDs {
+  if ([FSTIntegrationTestCase isRunningAgainstEmulator]) return;  // b/131774876
+
   // Use .document() to get a random collection group name to use but ensure it starts with 'b'
   // for predictable ordering.
   NSString *collectionGroup = [NSString
@@ -368,6 +370,8 @@
 }
 
 - (void)testCollectionGroupQueriesWithWhereFiltersOnArbitraryDocumentIDs {
+  if ([FSTIntegrationTestCase isRunningAgainstEmulator]) return;  // b/131774876
+
   // Use .document() to get a random collection group name to use but ensure it starts with 'b'
   // for predictable ordering.
   NSString *collectionGroup = [NSString
